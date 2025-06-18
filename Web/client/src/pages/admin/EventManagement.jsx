@@ -70,6 +70,9 @@ export default function EventManagement() {
   // State for client-side filtering
   const [allEvents, setAllEvents] = useState([]);
 
+  // State for status filtering
+  const [selectedStatusFilters, setSelectedStatusFilters] = useState([]);
+
   // Delivery status options
   const deliveryStatusOptions = [
     {
@@ -130,22 +133,33 @@ export default function EventManagement() {
 
   // Client-side search function
   const performClientSearch = (searchValue) => {
-    if (!searchValue.trim()) {
-      setEvents(allEvents);
-      return;
+    let filtered = allEvents;
+
+    // Apply text search filter
+    if (searchValue.trim()) {
+      filtered = filtered.filter(
+        (event) =>
+          event.event_name?.toLowerCase().includes(searchValue.toLowerCase()) ||
+          event.event_description
+            ?.toLowerCase()
+            .includes(searchValue.toLowerCase()) ||
+          event.event_author
+            ?.toLowerCase()
+            .includes(searchValue.toLowerCase()) ||
+          event.city?.toLowerCase().includes(searchValue.toLowerCase()) ||
+          event.state?.toLowerCase().includes(searchValue.toLowerCase()) ||
+          event.street_address
+            ?.toLowerCase()
+            .includes(searchValue.toLowerCase())
+      );
     }
 
-    const filtered = allEvents.filter(
-      (event) =>
-        event.event_name?.toLowerCase().includes(searchValue.toLowerCase()) ||
-        event.event_description
-          ?.toLowerCase()
-          .includes(searchValue.toLowerCase()) ||
-        event.event_author?.toLowerCase().includes(searchValue.toLowerCase()) ||
-        event.city?.toLowerCase().includes(searchValue.toLowerCase()) ||
-        event.state?.toLowerCase().includes(searchValue.toLowerCase()) ||
-        event.street_address?.toLowerCase().includes(searchValue.toLowerCase())
-    );
+    // Apply status filter
+    if (selectedStatusFilters.length > 0) {
+      filtered = filtered.filter((event) =>
+        selectedStatusFilters.includes(event.delivery_status)
+      );
+    }
 
     setEvents(filtered);
   };
@@ -275,6 +289,56 @@ export default function EventManagement() {
     );
   };
 
+  // Handle status filter toggle
+  const handleStatusFilterToggle = (status) => {
+    const newFilters = selectedStatusFilters.includes(status)
+      ? selectedStatusFilters.filter((s) => s !== status)
+      : [...selectedStatusFilters, status];
+
+    setSelectedStatusFilters(newFilters);
+
+    // Apply filters with current search term
+    let filtered = allEvents;
+
+    // Apply text search filter
+    if (searchTerm.trim()) {
+      filtered = filtered.filter(
+        (event) =>
+          event.event_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          event.event_description
+            ?.toLowerCase()
+            .includes(searchTerm.toLowerCase()) ||
+          event.event_author
+            ?.toLowerCase()
+            .includes(searchTerm.toLowerCase()) ||
+          event.city?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          event.state?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          event.street_address?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    // Apply status filter
+    if (newFilters.length > 0) {
+      filtered = filtered.filter((event) =>
+        newFilters.includes(event.delivery_status)
+      );
+    }
+
+    setEvents(filtered);
+  };
+
+  // Clear all filters
+  const handleClearFilters = () => {
+    setSelectedStatusFilters([]);
+    setSearchTerm("");
+    setEvents(allEvents);
+  };
+
+  // Get count for each status
+  const getStatusCount = (status) => {
+    return allEvents.filter((event) => event.delivery_status === status).length;
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <main className="p-3 sm:p-6 space-y-4 sm:space-y-6">
@@ -324,6 +388,90 @@ export default function EventManagement() {
               </Select>
             </div>
           </div>
+        </Card>
+
+        {/* Status Filter Tags */}
+        <Card className="p-3 sm:p-4 border-bluePrimary/20 shadow-sm bg-gradient-to-r from-bluePrimary/5 to-gold/5">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <span className="text-sm font-medium text-gray-700 flex-shrink-0">
+              Filter by Status:
+            </span>
+            <div className="flex flex-wrap gap-2">
+              {deliveryStatusOptions.map((option) => {
+                const count = getStatusCount(option.value);
+                const isSelected = selectedStatusFilters.includes(option.value);
+
+                return (
+                  <button
+                    key={option.value}
+                    onClick={() => handleStatusFilterToggle(option.value)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-full text-xs font-medium border transition-all duration-200 hover:scale-105",
+                      isSelected
+                        ? option.color +
+                            " ring-2 ring-offset-1 ring-current shadow-md"
+                        : "bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:shadow-sm"
+                    )}
+                  >
+                    {option.label}
+                    <span
+                      className={cn(
+                        "ml-1.5 px-1.5 py-0.5 rounded-full text-xs font-bold",
+                        isSelected
+                          ? "bg-white/80 text-current"
+                          : "bg-gray-100 text-gray-500"
+                      )}
+                    >
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            {(selectedStatusFilters.length > 0 || searchTerm) && (
+              <Button
+                onClick={handleClearFilters}
+                variant="outline"
+                size="sm"
+                className="h-7 px-3 text-xs border-red-200 text-red-600 hover:bg-red-50 flex-shrink-0"
+              >
+                Clear Filters
+              </Button>
+            )}
+          </div>
+
+          {/* Active Filters Summary */}
+          {(selectedStatusFilters.length > 0 || searchTerm) && (
+            <div className="mt-3 pt-3 border-t border-gray-200">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
+                <span className="font-medium">Active filters:</span>
+                {searchTerm && (
+                  <span className="px-2 py-1 bg-bluePrimary/10 text-bluePrimary rounded-full">
+                    Search: "{searchTerm}"
+                  </span>
+                )}
+                {selectedStatusFilters.map((status) => {
+                  const option = deliveryStatusOptions.find(
+                    (opt) => opt.value === status
+                  );
+                  return (
+                    <span
+                      key={status}
+                      className={cn(
+                        "px-2 py-1 rounded-full",
+                        option?.color || "bg-gray-100 text-gray-700"
+                      )}
+                    >
+                      {option?.label || status}
+                    </span>
+                  );
+                })}
+                <span className="text-gray-500">
+                  • Showing {events.length} of {allEvents.length} events
+                </span>
+              </div>
+            </div>
+          )}
         </Card>
 
         {/* Events List */}

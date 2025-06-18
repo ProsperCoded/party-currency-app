@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { getAllCurrencies, deleteCurrency } from "@/api/currencyApi";
 import { getEvents, getEventById } from "@/api/eventApi";
@@ -43,6 +43,10 @@ export function UserCurrencies() {
     template: null,
   });
   const [templateImages, setTemplateImages] = useState({});
+  const [downloadingCurrency, setDownloadingCurrency] = useState(null);
+
+  // Refs for each currency's front and back canvas
+  const canvasRefs = useRef({});
 
   useEffect(() => {
     const fetchData = async () => {
@@ -160,35 +164,46 @@ export function UserCurrencies() {
     );
   };
 
+  // Updated download handler for both sides
   const handleDownload = async (template) => {
-    // Check if payment is successful before allowing download
     if (!isPaymentSuccessful(template.event_id)) {
       toast.error(
         "Payment required: Please complete payment for this event before downloading currencies."
       );
       return;
     }
+    const currencyId = template.currency_id;
+    const denomination = template.denomination || "200";
+    const currencyName = template.currency_name || "Currency";
+    const frontKey = `${currencyId}-front`;
+    const backKey = `${currencyId}-back`;
+    const frontRef = canvasRefs.current[frontKey];
+    const backRef = canvasRefs.current[backKey];
 
-    try {
-      // Check if front_image exists, if not display an error
-      const imageUrl = template.front_image;
-
-      if (!imageUrl) {
-        throw new Error("No image available for this template");
-      }
-
-      // For Google Drive links, we need to modify the URL to get the direct download link
-      const directUrl = imageUrl.includes("drive.google.com")
-        ? imageUrl.replace("/view?usp=sharing", "/uc?export=download")
-        : imageUrl;
-
-      window.open(directUrl, "_blank");
-      toast.success("Opening image for download");
-    } catch (error) {
-      console.error("Error downloading template:", error);
+    if (!frontRef?.isReady() || !backRef?.isReady()) {
       toast.error(
-        error.message || "Failed to download template. Please try again."
+        "Currency images not ready for download. Please wait a moment and try again."
       );
+      return;
+    }
+    setDownloadingCurrency(currencyId);
+    try {
+      const baseName = `${currencyName}-₦${denomination}`;
+      // Download front
+      const frontSuccess = frontRef.downloadImage(`${baseName}-front.png`);
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      // Download back
+      const backSuccess = backRef.downloadImage(`${baseName}-back.png`);
+      if (frontSuccess && backSuccess) {
+        toast.success("Both sides downloaded successfully!");
+      } else {
+        toast.error("Some images failed to download. Please try again.");
+      }
+    } catch (error) {
+      console.error("Download error:", error);
+      toast.error("An error occurred while downloading. Please try again.");
+    } finally {
+      setDownloadingCurrency(null);
     }
   };
 
@@ -270,16 +285,24 @@ export function UserCurrencies() {
         {templates.map((template) => {
           const denomination = template.denomination || "200";
           const templateImage = templateImages[template.currency_id];
+          const currencyId = template.currency_id;
+          // --- Add refs for front and back ---
+          const frontKey = `${currencyId}-front`;
+          const backKey = `${currencyId}-back`;
           console.log("currency image", templateImage, template);
           return (
             <div
-              key={template.currency_id}
+              key={currencyId}
               className="group bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-xl hover:border-bluePrimary/30 transition-all duration-300"
             >
               {/* Currency Image Section */}
               <div className="bg-gradient-to-br from-gray-50 to-gray-100 relative overflow-hidden">
                 <div className="w-full relative aspect-[3/2]">
+                  {/* Visible front canvas for preview */}
                   <CurrencyCanvas
+                    ref={(ref) => {
+                      if (ref) canvasRefs.current[frontKey] = ref;
+                    }}
                     templateImage={getTemplateImage(denomination)}
                     texts={{
                       eventId: template.event_id,
@@ -291,6 +314,33 @@ export function UserCurrencies() {
                     denomination={denomination}
                     portraitImage={templateImage?.front}
                   />
+                  {/* Hidden back canvas for download only */}
+                  <div
+                    style={{
+                      position: "absolute",
+                      left: "-9999px",
+                      top: 0,
+                      width: 0,
+                      height: 0,
+                      overflow: "hidden",
+                    }}
+                  >
+                    <CurrencyCanvas
+                      ref={(ref) => {
+                        if (ref) canvasRefs.current[backKey] = ref;
+                      }}
+                      templateImage={getTemplateImage(denomination)}
+                      texts={{
+                        eventId: template.event_id,
+                        currencyName: template.currency_name,
+                        celebration: template.back_celebration_text,
+                        dominationText: "200",
+                      }}
+                      side="back"
+                      denomination={denomination}
+                      portraitImage={templateImage?.back}
+                    />
+                  </div>
                 </div>
 
                 {/* Denomination Badge */}
@@ -479,9 +529,9 @@ export function UserCurrencies() {
                         }
                       />
                       {/* Mobile scroll overlay */}
-                      <div 
+                      <div
                         className="absolute inset-0 bg-transparent md:hidden"
-                        style={{ touchAction: 'pan-y pinch-zoom' }}
+                        style={{ touchAction: "pan-y pinch-zoom" }}
                       />
                     </div>
                   ) : (
@@ -525,9 +575,9 @@ export function UserCurrencies() {
                         }
                       />
                       {/* Mobile scroll overlay */}
-                      <div 
+                      <div
                         className="absolute inset-0 bg-transparent md:hidden"
-                        style={{ touchAction: 'pan-y pinch-zoom' }}
+                        style={{ touchAction: "pan-y pinch-zoom" }}
                       />
                     </div>
                   ) : (

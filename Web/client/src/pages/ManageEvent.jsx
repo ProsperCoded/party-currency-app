@@ -71,11 +71,14 @@ export default function ManageEvent() {
   }
 
   // Filter events based on active tab
+  const today = new Date();
   const filteredEvents = events.filter((event) => {
+    const endDate = event.end_date ? new Date(event.end_date) : null;
+    if (!endDate) return false;
     if (activeTab === "ongoing") {
-      return !event.concluded;
+      return endDate >= today;
     } else {
-      return event.concluded;
+      return endDate < today;
     }
   });
 

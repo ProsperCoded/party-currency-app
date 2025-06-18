@@ -16,16 +16,6 @@ export default function Dashboard() {
   const { userProfile } = useContext(USER_PROFILE_CONTEXT);
   const { accessToken } = getAuth();
 
-  // Redirect if no auth token or user profile
-  if (!accessToken) {
-    navigate("/login");
-    return null;
-  }
-
-  if (!userProfile) {
-    return <LoadingDisplay message="Loading user profile..." />;
-  }
-
   const { data, isLoading, error } = useQuery({
     queryKey: ["events"],
     queryFn: getEvents,
@@ -39,14 +29,6 @@ export default function Dashboard() {
 
   // Ensure events is always an array
   const events = data?.events || [];
-
-  // Calculate total stats with safeguards
-  const totalAmount = events.reduce((sum, event) => {
-    const amount = typeof event.amount === "number" ? event.amount : 0;
-    return sum + amount;
-  }, 0);
-
-  const totalEvents = events.length;
 
   // Transform events into transaction format with proper date handling
   const transactions = events.map((event) => ({
@@ -94,6 +76,21 @@ export default function Dashboard() {
   if (isLoading) {
     return <LoadingDisplay message="Loading dashboard..." />;
   }
+
+  // Redirect if no auth token or user profile
+  if (!accessToken) {
+    navigate("/login");
+    return null;
+  }
+
+  if (!userProfile) {
+    return <LoadingDisplay message="Loading user profile..." />;
+  }
+
+  // Calculate total stats with safeguards
+  const totalAmount = userProfile.total_amount_spent;
+
+  const totalEvents = events.length;
 
   return (
     <div className="p-3 sm:p-6">
